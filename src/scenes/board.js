@@ -77,6 +77,7 @@ class Board {
 }
 
 const PLAYER_VELOCITY = 80;
+const PLAYER_JUMP_VELOCITY = -190;
 
 class Player extends Phaser.GameObjects.Container {
   constructor(scene, x, y) {
@@ -99,6 +100,7 @@ class Player extends Phaser.GameObjects.Container {
       {
         idle: new IdleState(),
         walk: new WalkingState(),
+        jump: new JumpingState(),
       },
       [scene, this]
     );
@@ -126,6 +128,14 @@ class Player extends Phaser.GameObjects.Container {
       frameRate: 10,
       repeat: -1,
     });
+    scene.anims.create({
+      key: 'playerSpinJump',
+      frames: scene.anims.generateFrameNumbers('player', {
+        frames: [8, 9, 10, 11, 12, 13],
+      }),
+      frameRate: 10,
+      repeat: -1,
+    });
   }
 
   update(time, delta) {
@@ -140,8 +150,10 @@ class IdleState extends State {
   }
 
   execute(scene) {
-    const { right, left } = scene.keys;
-    if (right.isDown || left.isDown) {
+    const { right, left, D } = scene.keys;
+    if (D.isDown) {
+      return 'jump';
+    } else if (right.isDown || left.isDown) {
       return 'walk';
     }
   }
@@ -153,7 +165,12 @@ class WalkingState extends State {
   }
 
   execute(scene, player) {
-    const { right, left } = scene.keys;
+    const { right, left, D } = scene.keys;
+
+    if (D.isDown) {
+      return 'jump';
+    }
+
     let dx = 0;
     let dy = 0;
 
@@ -170,6 +187,34 @@ class WalkingState extends State {
       return 'idle';
     }
 
-    player.body.setVelocity(dx, dy);
+    player.body.setVelocityX(dx);
+  }
+}
+
+class JumpingState extends State {
+  handleEntered(scene, player) {
+    player.sprite.play('playerSpinJump');
+    player.body.setVelocityY(PLAYER_JUMP_VELOCITY);
+  }
+
+  execute(scene, player) {
+    const { right, left } = scene.keys;
+    let dx = 0;
+    let dy = 0;
+
+    if (right.isDown && !left.isDown) {
+      dx = PLAYER_VELOCITY;
+      player.direction = 'right';
+    } else if (left.isDown && !right.isDown) {
+      dx = -PLAYER_VELOCITY;
+      player.direction = 'left';
+    }
+
+    // Exit to idle state if we're standing on something
+    if (player.body.blocked.down) {
+      return 'idle';
+    }
+
+    player.body.setVelocityX(dx);
   }
 }
